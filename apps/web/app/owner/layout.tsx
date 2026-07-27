@@ -11,9 +11,12 @@ const NAV_ITEMS = [
   { label: 'Reports', href: '/owner/reports' },
 ]
 
+// Platform admins can also access the owner section (useful for
+// testing/support) even without their own organization membership.
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getUserContext()
-  if (!ctx || !ctx.accessibleSections.includes('owner')) redirect('/unauthorized')
+  const isAdmin = ctx?.platformRole === 'platform_admin'
+  if (!ctx || (!ctx.accessibleSections.includes('owner') && !isAdmin)) redirect('/unauthorized')
 
   return (
     <DashboardShell section="Station Owner" navItems={NAV_ITEMS}>
