@@ -10,15 +10,12 @@ export async function createStation(formData: FormData) {
   const organizationId = formData.get('organizationId')?.toString()
 
   if (!name || !organizationId) {
-    return { error: 'Station name is required.' }
+    console.error('Station name is required.')
+    return
   }
 
   const supabase = createClient()
 
-  // RLS (migration 10, "owners/managers modify their stations") already
-  // enforces that the current user has an owner/manager membership in
-  // this organization_id — no need to re-check that here, the insert
-  // simply fails under RLS if they don't.
   const { error } = await supabase.from('stations').insert({
     organization_id: organizationId,
     name,
@@ -27,7 +24,8 @@ export async function createStation(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    console.error('createStation failed:', error.message)
+    return
   }
 
   revalidatePath('/owner/stations')
