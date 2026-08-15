@@ -49,3 +49,26 @@ export async function updateOrganizationStatus(formData: FormData) {
 
   revalidatePath('/admin/organizations')
 }
+export async function updateOrganizationPlan(formData: FormData) {
+  const organizationId = formData.get('organizationId')?.toString()
+  const newPlan = formData.get('newPlan')?.toString()
+
+  if (!organizationId || !newPlan) {
+    console.error('updateOrganizationPlan: missing organizationId or newPlan')
+    return
+  }
+
+  const supabase = createClient()
+
+  const { error } = await supabase
+    .from('organizations')
+    .update({ plan: newPlan })
+    .eq('id', organizationId)
+
+  if (error) {
+    console.error('updateOrganizationPlan failed:', error.message)
+    return
+  }
+
+  revalidatePath('/admin/subscriptions')
+}
