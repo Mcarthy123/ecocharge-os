@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { updateBookingStatus } from '@/lib/actions/bookings'
+import { updateBookingStatus, setBookingAmount } from '@/lib/actions/bookings'
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-400',
@@ -31,7 +31,7 @@ export default async function ManagerBookingsPage() {
   const { data: bookings } = await supabase
     .from('bookings')
     .select(
-      'id, reserved_from, reserved_until, status, driver_id, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
+      'id, reserved_from, reserved_until, status, amount_pesewas, driver_id, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
     )
     .eq('chargers.stations.organization_id', membership.organization_id)
     .order('reserved_from', { ascending: false })
@@ -71,9 +71,14 @@ export default async function ManagerBookingsPage() {
                     {new Date(booking.reserved_from).toLocaleString()} –{' '}
                     {new Date(booking.reserved_until).toLocaleTimeString()}
                   </p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {booking.amount_pesewas != null
+                      ? `GH₵${(booking.amount_pesewas / 100).toFixed(2)}`
+                      : 'No amount set'}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={
                       'rounded-full px-2 py-0.5 text-xs ' +
@@ -82,6 +87,29 @@ export default async function ManagerBookingsPage() {
                   >
                     {booking.status.replace('_', ' ')}
                   </span>
+
+                  <form action={setBookingAmount} className="flex items-center gap-1">
+                    <input type="hidden" name="bookingId" value={booking.id} />
+                    <input
+                      type="number"
+                      name="amountGhs"
+                      step="0.01"
+                      min="0"
+                      placeholder="GH₵"
+                      defaultValue={
+                        booking.amount_pesewas != null
+                          ? (booking.amount_pesewas / 100).toFixed(2)
+                          : ''
+                      }
+                      className="w-20 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
+                    >
+                      Set
+                    </button>
+                  </form>
 
                   {(booking.status === 'pending' || booking.status === 'in_queue') && (
                     <>
