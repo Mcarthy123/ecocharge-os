@@ -53,3 +53,60 @@ export async function setBookingAmount(formData: FormData) {
 
   revalidatePath('/manager/bookings')
 }
+export async function generatePaymentLink(formData: FormData) {
+  const bookingId = formData.get('bookingId')?.toString()
+  const email = formData.get('driverEmail')?.toString()
+  const amountPesewasRaw = formData.get('amountPesewas')?.toString()
+  const amountPesewas = amountPesewasRaw ? Number(amountPesewasRaw) : NaN
+
+  if (!bookingId || !email || !amountPesewasRaw || isNaN(amountPesewas) || amountPesewas <= 0) {
+    console.error('generatePaymentLink: missing or invalid bookingId/email/amount')
+    return
+  }
+
+  const secret = process.env.PAYSTACK_SECRET_KEY
+  if (!secret) {
+    console.error('generatePaymentLink: PAYSTACK_SECRET_KEY not configured')
+    return
+  }
+
+  const reference = `ECOOS-${bookingId.slice(0, 8)}-${Date.now()}`
+
+  const res = await fetch('https://api.paystack.co/transaction/initialize', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      amount: amountPesewas,
+      reference,
+      currency: 'GHS',
+    }),
+  })
+
+  const data = await res.json()
+
+  if (!data.status || !data.data?.authorization_url) {
+    console.error('generatePaymentLink: Paystack init failed', data.message)
+    return
+  }
+
+  const supabase = createClient()
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({
+      payment_reference: reference,
+      payment_link: data.data.authorization_url,
+    })
+    .eq('id', bookingId)
+
+  if (error) {
+    console.error('generatePaymentLink: failed to save reference', error.message)
+    return
+  }
+
+  revalidatePath('/manager/bookings')
+}
