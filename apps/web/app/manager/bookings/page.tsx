@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { updateBookingStatus, setBookingAmount } from '@/lib/actions/bookings'
+import { updateBookingStatus, setBookingAmount, generatePaymentLink } from '@/lib/actions/bookings'
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-400',
@@ -9,6 +9,12 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: 'bg-neutral-800 text-neutral-400',
   completed: 'bg-neutral-800 text-neutral-400',
   no_show: 'bg-red-500/20 text-red-400',
+}
+
+const PAYMENT_STYLES: Record<string, string> = {
+  paid: 'bg-accent/20 text-accent',
+  unpaid: 'bg-neutral-800 text-neutral-400',
+  failed: 'bg-red-500/20 text-red-400',
 }
 
 export default async function ManagerBookingsPage() {
@@ -31,7 +37,7 @@ export default async function ManagerBookingsPage() {
   const { data: bookings } = await supabase
     .from('bookings')
     .select(
-      'id, reserved_from, reserved_until, status, amount_pesewas, driver_id, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
+      'id, reserved_from, reserved_until, status, amount_pesewas, payment_status, payment_link, payment_reference, driver_id, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
     )
     .eq('chargers.stations.organization_id', membership.organization_id)
     .order('reserved_from', { ascending: false })
@@ -56,11 +62,12 @@ export default async function ManagerBookingsPage() {
             const station = (booking as any).chargers?.stations
             const charger = (booking as any).chargers
             const driverName = (booking as any).profiles?.full_name ?? 'Unknown driver'
+            const paymentStatus = booking.payment_status ?? 'unpaid'
 
             return (
               <div
                 key={booking.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
               >
                 <div>
                   <p className="text-sm font-medium">
@@ -76,6 +83,15 @@ export default async function ManagerBookingsPage() {
                       ? `GH₵${(booking.amount_pesewas / 100).toFixed(2)}`
                       : 'No amount set'}
                   </p>
+                  {booking.payment_link && (
+                    
+                      href={booking.payment_link}
+                      target="_blank"
+                      className="text-xs text-accent underline break-all"
+                    >
+                      {booking.payment_link}
+                    </a>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -86,6 +102,14 @@ export default async function ManagerBookingsPage() {
                     }
                   >
                     {booking.status.replace('_', ' ')}
+                  </span>
+                  <span
+                    className={
+                      'rounded-full px-2 py-0.5 text-xs ' +
+                      (PAYMENT_STYLES[paymentStatus] ?? 'bg-neutral-800 text-neutral-400')
+                    }
+                  >
+                    {paymentStatus}
                   </span>
 
                   <form action={setBookingAmount} className="flex items-center gap-1">
@@ -110,6 +134,26 @@ export default async function ManagerBookingsPage() {
                       Set
                     </button>
                   </form>
+
+                  {booking.amount_pesewas != null && paymentStatus !== 'paid' && (
+                    <form action={generatePaymentLink} className="flex items-center gap-1">
+                      <input type="hidden" name="bookingId" value={booking.id} />
+                      <input type="hidden" name="amountPesewas" value={booking.amount_pesewas} />
+                      <input
+                        type="email"
+                        name="driverEmail"
+                        placeholder="driver@email.com"
+                        required
+                        className="w-36 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
+                      >
+                        {booking.payment_link ? 'Regenerate link' : 'Generate link'}
+                      </button>
+                    </form>
+                  )}
 
                   {(booking.status === 'pending' || booking.status === 'in_queue') && (
                     <>
