@@ -83,14 +83,7 @@ export default async function ManagerBookingsPage() {
                       ? `GH₵${(booking.amount_pesewas / 100).toFixed(2)}`
                       : 'No amount set'}
                   </p>
-                                  {booking.payment_link && (
-                    
-                      href={booking.payment_link}
-                      target="_blank"
-                      className="text-xs text-accent underline break-all"
-                    >
-                      {booking.payment_link}
-                    </a>
+                                    {booking.payment_link && (<a href={booking.payment_link} target="_blank" className="text-xs text-accent underline break-all">{booking.payment_link}</a>)}
                   )}
                 </div>
 
