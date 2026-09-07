@@ -29,6 +29,11 @@ export function sectionForOrgRole(role: OrgRole): DashboardSection {
 // The section a path like /owner/stations/123 belongs to, or null if
 // the path isn't under any role-guarded dashboard section (e.g. /login).
 export function sectionForPath(pathname: string): DashboardSection | null {
+  // /driver itself is the public marketplace browse page — anyone can
+  // see it, signed in or not. Only deeper driver pages (vehicle,
+  // rewards, bookings) require an actual fleet-driver org membership.
+  if (pathname === '/driver') return null
+
   const match = DASHBOARD_SECTIONS.find(
     (section) => pathname === `/${section}` || pathname.startsWith(`/${section}/`)
   )
