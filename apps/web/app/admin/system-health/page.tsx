@@ -8,7 +8,7 @@ export default async function SystemHealthPage() {
   const [
     { count: orgCount },
     { count: stationCount },
-    { count: activeStationCount },
+    { count: activeStationCount }, 
     { data: chargers },
     { count: bookingsThisWeek },
   ] = await Promise.all([
