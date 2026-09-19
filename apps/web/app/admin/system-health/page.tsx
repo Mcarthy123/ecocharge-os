@@ -6,7 +6,7 @@ export default async function SystemHealthPage() {
   const supabase = createClient()
 
   const [
-    { count: orgCount },
+    { count: orgCount }, 
     { count: stationCount },
     { count: activeStationCount }, 
     { data: chargers },
