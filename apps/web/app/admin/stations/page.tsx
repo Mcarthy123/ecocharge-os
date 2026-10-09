@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+ import { createClient } from '@/lib/supabase/server'
 import { updateStationStatus } from '@/lib/actions/admin'
 
 const STATUS_STYLES: Record<string, string> = {
