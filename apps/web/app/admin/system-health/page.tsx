@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic' 
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server' 
 
 export default async function SystemHealthPage() { 
   const supabase = createClient()
