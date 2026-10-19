@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation' b
+import { redirect } from 'next/navigation' 
 import { createClient } from '@/lib/supabase/server' 
 import { inviteEmployee } from '@/lib/actions/employees'
 
