@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call sync endpoint
-        run: curl --fail --silent --show-error https://ecocharge-os.vercel.app/api/cron/sync-charger-status
+        run: curl --fail --silent --show-error -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://ecocharge-os.vercel.app/api/cron/sync-charger-status
