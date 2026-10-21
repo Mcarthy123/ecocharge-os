@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Only callers that know the shared secret (GitHub Actions, Vercel Cron) may run this.
+  const authHeader = request.headers.get('authorization')
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const ghana = createClient(
     process.env.GHANA_SUPABASE_URL!,
     process.env.GHANA_SUPABASE_ANON_KEY!
