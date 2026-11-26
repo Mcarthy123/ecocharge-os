@@ -39,7 +39,7 @@ export default async function ManagerBookingsPage() {
   const { data: bookings } = await supabase
     .from('bookings')
     .select(
-      'id, reserved_from, reserved_until, status, amount_pesewas, payment_status, payment_link, payment_reference, driver_id, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
+      'id, reserved_from, reserved_until, status, amount_pesewas, payment_status, payment_link, payment_reference, driver_id, source, driver_name, driver_vehicle, external_reference, profiles(full_name), chargers!inner(id, ocpp_charge_point_id, stations!inner(id, name, organization_id))'
     )
     .eq('chargers.stations.organization_id', membership.organization_id)
     .order('reserved_from', { ascending: false })
@@ -49,21 +49,20 @@ export default async function ManagerBookingsPage() {
       <div>
         <h1 className="text-lg font-semibold">Bookings queue</h1>
         <p className="text-sm text-neutral-400">
-          Approve, cancel, or mark bookings complete for your stations.
+          Bookings for your stations. Bookings made in the EcoCharge app appear here automatically.
         </p>
       </div>
 
       {!bookings || bookings.length === 0 ? (
-        <p className="text-sm text-neutral-400">
-          No bookings yet. These appear once drivers reserve a charger (Phase 10) — for now,
-          test rows can be added directly in Supabase&apos;s Table Editor.
-        </p>
+        <p className="text-sm text-neutral-400">No bookings yet.</p>
       ) : (
         <div className="divide-y divide-neutral-800 rounded-lg border border-neutral-800">
           {bookings.map((booking) => {
-            const station = (booking as any).chargers?.stations
-            const charger = (booking as any).chargers
-            const driverName = (booking as any).profiles?.full_name ?? 'Unknown driver'
+            const b = booking as any
+            const station = b.chargers?.stations
+            const charger = b.chargers
+            const fromApp = b.source === 'ghana'
+            const driverName = b.driver_name ?? b.profiles?.full_name ?? 'Unknown driver'
             const paymentStatus = booking.payment_status ?? 'unpaid'
 
             return (
@@ -84,8 +83,23 @@ export default async function ManagerBookingsPage() {
                     {booking.amount_pesewas != null
                       ? `GH₵${(booking.amount_pesewas / 100).toFixed(2)}`
                       : 'No amount set'}
-                                   </p>
-                  {booking.payment_link && (<a href={booking.payment_link} target="_blank" className="text-xs text-accent underline break-all">{booking.payment_link}</a>)}
+                  </p>
+                  {fromApp && (
+                    <p className="text-xs text-accent mt-1">
+                      Booked in the EcoCharge app
+                      {b.external_reference ? ` · ${b.external_reference}` : ''}
+                      {b.driver_vehicle ? ` · ${b.driver_vehicle}` : ''}
+                    </p>
+                  )}
+                  {!fromApp && booking.payment_link && (
+                    <a
+                      href={booking.payment_link}
+                      target="_blank"
+                      className="text-xs text-accent underline break-all"
+                    >
+                      {booking.payment_link}
+                    </a>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -97,105 +111,112 @@ export default async function ManagerBookingsPage() {
                   >
                     {booking.status.replace('_', ' ')}
                   </span>
-                  <span
-                    className={
-                      'rounded-full px-2 py-0.5 text-xs ' +
-                      (PAYMENT_STYLES[paymentStatus] ?? 'bg-neutral-800 text-neutral-400')
-                    }
-                  >
-                    {paymentStatus}
-                  </span>
 
-                  <form action={setBookingAmount} className="flex items-center gap-1">
-                    <input type="hidden" name="bookingId" value={booking.id} />
-                    <input
-                      type="number"
-                      name="amountGhs"
-                      step="0.01"
-                      min="0"
-                      placeholder="GH₵"
-                      defaultValue={
-                        booking.amount_pesewas != null
-                          ? (booking.amount_pesewas / 100).toFixed(2)
-                          : ''
-                      }
-                      className="w-20 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
-                    >
-                      Set
-                    </button>
-                  </form>
-
-                  {booking.amount_pesewas != null && paymentStatus !== 'paid' && (
-                    <form action={generatePaymentLink} className="flex items-center gap-1">
-                      <input type="hidden" name="bookingId" value={booking.id} />
-                      <input type="hidden" name="amountPesewas" value={booking.amount_pesewas} />
-                      <input
-                        type="email"
-                        name="driverEmail"
-                        placeholder="driver@email.com"
-                        required
-                        className="w-36 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
+                  {fromApp ? (
+                    <span className="text-xs text-neutral-500">Payment handled in the app</span>
+                  ) : (
+                    <>
+                      <span
+                        className={
+                          'rounded-full px-2 py-0.5 text-xs ' +
+                          (PAYMENT_STYLES[paymentStatus] ?? 'bg-neutral-800 text-neutral-400')
+                        }
                       >
-                        {booking.payment_link ? 'Regenerate link' : 'Generate link'}
-                      </button>
-                    </form>
-                  )}
+                        {paymentStatus}
+                      </span>
 
-                  {(booking.status === 'pending' || booking.status === 'in_queue') && (
-                    <>
-                      <form action={updateBookingStatus}>
+                      <form action={setBookingAmount} className="flex items-center gap-1">
                         <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="newStatus" value="confirmed" />
+                        <input
+                          type="number"
+                          name="amountGhs"
+                          step="0.01"
+                          min="0"
+                          placeholder="GH₵"
+                          defaultValue={
+                            booking.amount_pesewas != null
+                              ? (booking.amount_pesewas / 100).toFixed(2)
+                              : ''
+                          }
+                          className="w-20 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
+                        />
                         <button
                           type="submit"
-                          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-base-950 hover:bg-accent-muted"
+                          className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
                         >
-                          Confirm
+                          Set
                         </button>
                       </form>
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="newStatus" value="cancelled" />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-neutral-700 px-3 py-1 text-xs hover:bg-base-800"
-                        >
-                          Cancel
-                        </button>
-                      </form>
-                    </>
-                  )}
 
-                  {booking.status === 'confirmed' && (
-                    <>
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="newStatus" value="completed" />
-                        <button
-                          type="submit"
-                          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-base-950 hover:bg-accent-muted"
-                        >
-                          Mark complete
-                        </button>
-                      </form>
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="newStatus" value="no_show" />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-neutral-700 px-3 py-1 text-xs hover:bg-base-800"
-                        >
-                          No-show
-                        </button>
-                      </form>
+                      {booking.amount_pesewas != null && paymentStatus !== 'paid' && (
+                        <form action={generatePaymentLink} className="flex items-center gap-1">
+                          <input type="hidden" name="bookingId" value={booking.id} />
+                          <input type="hidden" name="amountPesewas" value={booking.amount_pesewas} />
+                          <input
+                            type="email"
+                            name="driverEmail"
+                            placeholder="driver@email.com"
+                            required
+                            className="w-36 rounded-md border border-neutral-800 bg-base-900 px-2 py-1 text-xs outline-none focus:border-accent"
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-md border border-neutral-700 px-2 py-1 text-xs hover:bg-base-800"
+                          >
+                            {booking.payment_link ? 'Regenerate link' : 'Generate link'}
+                          </button>
+                        </form>
+                      )}
+
+                      {(booking.status === 'pending' || booking.status === 'in_queue') && (
+                        <>
+                          <form action={updateBookingStatus}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="newStatus" value="confirmed" />
+                            <button
+                              type="submit"
+                              className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-base-950 hover:bg-accent-muted"
+                            >
+                              Confirm
+                            </button>
+                          </form>
+                          <form action={updateBookingStatus}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="newStatus" value="cancelled" />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-neutral-700 px-3 py-1 text-xs hover:bg-base-800"
+                            >
+                              Cancel
+                            </button>
+                          </form>
+                        </>
+                      )}
+
+                      {booking.status === 'confirmed' && (
+                        <>
+                          <form action={updateBookingStatus}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="newStatus" value="completed" />
+                            <button
+                              type="submit"
+                              className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-base-950 hover:bg-accent-muted"
+                            >
+                              Mark complete
+                            </button>
+                          </form>
+                          <form action={updateBookingStatus}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="newStatus" value="no_show" />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-neutral-700 px-3 py-1 text-xs hover:bg-base-800"
+                            >
+                              No-show
+                            </button>
+                          </form>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
