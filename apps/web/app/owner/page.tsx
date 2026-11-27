@@ -123,7 +123,7 @@ export default async function OwnerOverviewPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-lg border border-neutral-800 bg-base-900 p-4">
           <p className="text-xs uppercase tracking-wide text-neutral-500">Stations</p>
           <p className="mt-1 text-2xl font-semibold">{stationIds.length}</p>
